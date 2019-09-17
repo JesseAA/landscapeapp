@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Fragment } from 'react';
 import { pure, withState } from 'recompose';
 import SvgIcon from '@material-ui/core/SvgIcon';
 import StarIcon from '@material-ui/icons/Star';
@@ -159,7 +159,7 @@ const ItemDialogContent = ({itemInfo, isLandscape, setIsLandscape}) => {
 
   const linkToOrganization = filtersToUrl({grouping: 'organization', filters: {organization: itemInfo.organization}});
   const itemCategory = function(path) {
-    var separator = <span className="product-category-separator">•</span>;
+    var separator = <span className="product-category-separator" key="product-category-separator">•</span>;
     var subcategory = _.find(fields.landscape.values,{id: path});
     var category = _.find(fields.landscape.values, {id: subcategory.parentId});
     var categoryMarkup = (
@@ -270,10 +270,10 @@ const ItemDialogContent = ({itemInfo, isLandscape, setIsLandscape}) => {
   );
 
   const scrollAllContent = currentDevice.mobile() && isLandscape;
-  const productLogoAndTags = [
+  const productLogoAndTags = <Fragment>
             <div className="product-logo" style={getRelationStyle(itemInfo.relation)}>
               <img src={itemInfo.href} className='product-logo-img'/>
-            </div>,
+            </div>
             <div className="product-tags">
               <div>{projectTag(itemInfo)}</div>
               <div>{parentTag(itemInfo)}</div>
@@ -282,8 +282,8 @@ const ItemDialogContent = ({itemInfo, isLandscape, setIsLandscape}) => {
               <div>{badgeTag(itemInfo)}</div>
               <TweetButton/>
             </div>
-  ];
-  const productInfo = [
+  </Fragment>;
+  const productInfo = <Fragment>
               <div className="product-main">
                 { !isGoogle && <React.Fragment>
                     <div className="product-name">{itemInfo.name}</div>
@@ -299,8 +299,7 @@ const ItemDialogContent = ({itemInfo, isLandscape, setIsLandscape}) => {
                     <div className="product-category">{itemCategory(itemInfo.landscape)}</div>
                   </React.Fragment>
                 }
-              </div>,
-
+              </div>
               <div className="product-properties">
                 <div className="product-property row">
                   <div className="product-property-name col col-20">Website</div>
@@ -340,7 +339,7 @@ const ItemDialogContent = ({itemInfo, isLandscape, setIsLandscape}) => {
                 <div className="product-property row">
                   <div className="product-property-name col col-20">LinkedIn</div>
                   <div className="product-property-value col col-80">
-                    <OutboundLink eventLabel={itemInfo.crunchbaseData.linkedIn} to={itemInfo.crunchbaseData.linkedin} target="_blank">{itemInfo.crunchbaseData.linkedin}</OutboundLink>
+                    <OutboundLink eventLabel={itemInfo.crunchbaseData.linkedin} to={itemInfo.crunchbaseData.linkedin} target="_blank">{itemInfo.crunchbaseData.linkedin}</OutboundLink>
                   </div>
                 </div>
                 }
@@ -375,7 +374,7 @@ const ItemDialogContent = ({itemInfo, isLandscape, setIsLandscape}) => {
                   }
               </div>
             </div>
-  ];
+  </Fragment>;
 
   return (
         <div className="modal-content">
