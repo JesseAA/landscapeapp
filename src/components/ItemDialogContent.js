@@ -92,7 +92,6 @@ const projectTag = function({relation, member, isSubsidiaryProject, project, end
   }
 
   if (relation === 'member' || relation === 'company') {
-    console.info(settings.membership, member);
     const info = settings.membership[member];
     const name = info.name;
     const label = enduser ? (info.end_user_label || info.label) : info.label ;
