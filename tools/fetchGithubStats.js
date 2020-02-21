@@ -12,9 +12,11 @@ import { settings, projectPath } from './settings';
 import makeReporter from './progressReporter';
 const debug = require('debug')('github');
 import shortRepoName from '../src/utils/shortRepoName';
-import getRepositoryInfo from './getRepositoryInfo';
+import getRepositoryInfo , { getLanguages, getWeeklyContributions}  from './getRepositoryInfo';
 
 import { getRepoLatestDate ,getReleaseDate } from './githubDates';
+
+const githubColors = JSON.parse(require('fs').readFileSync('tools/githubColors.json', 'utf-8'));
 
 const error = colors.red;
 const fatal = (x) => colors.red(colors.inverse(x));
@@ -87,13 +89,25 @@ export async function fetchGithubEntries({cache, preferCache}) {
       const url = repo.url;
       if (url.split('/').length !==  5 || !url.split('/')[4]) {
         addError('github');
-        setFatalError();
+        setFatalError(`${repo.url} does not look like a github repo`);
         reporter.write(fatal('F'));
         errors.push(fatal(`${repo.url} does not look like a github repo`));
         return null;
       }
       const repoName = shortRepoName(url);
       const apiInfo = await getRepositoryInfo(url);
+      const languagesInfo = await getLanguages(url);
+      const languages = _.keys(languagesInfo).map(function(key) {
+        return {
+          name: key,
+          value: languagesInfo[key],
+          color: githubColors[key]
+        }
+      });
+      const contributionsInfo = await getWeeklyContributions(url);
+      const contributions = contributionsInfo.all.join(';');
+      const firstWeek = new Date();
+      firstWeek.setDate(firstWeek.getDate() - firstWeek.getDay() - 51 * 7);
       const stars = apiInfo.stargazers_count || 0;
       let license = (apiInfo.license || {}).name || 'Unknown License';
       if (license === 'NOASSERTION') {
@@ -107,27 +121,16 @@ export async function fetchGithubEntries({cache, preferCache}) {
       const releaseLink = releaseDate && `${url}/releases`;
       const getContributorsCount = async function() {
         var response = await rp({
-          uri: url,
+          uri: `${url}/contributors_size`,
           followRedirect: true,
           timeout: 30 * 1000,
           simple: true
         });
         const dom = new JSDOM(response);
         const doc = dom.window.document;
-        var element = doc.querySelector('.numbers-summary .octicon-organization').parentElement.querySelector('span');
-        var count = +element.textContent.replace(/\n/g, '').replace(',', '').trim();
-        if (!count) {
-          const puppeteer = require('puppeteer');
-          const browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox']});
-          const page = await browser.newPage();
-          await page.goto(url);
-          await Promise.delay(5000);
-          const content = await page.evaluate( () => document.querySelector('.numbers-summary .octicon-organization+span').textContent );
-          await browser.close();
-          count = +content.replace(/\n/g, '').replace(',', '').trim();
-          return count;
-        }
-        return count;
+        var element = doc.querySelector('.num');
+        var count = element.textContent.replace(/[^\d]/g, '').trim();
+        return parseInt(count);
       };
       const contributorsCount = await getContributorsCount();
       const contributorsLink = `${url}/graphs/contributors`;
@@ -141,6 +144,9 @@ export async function fetchGithubEntries({cache, preferCache}) {
       reporter.write(cacheMiss('*'));
       return ({
         url: repo.url,
+        languages,
+        contributions,
+        firstWeek: firstWeek.toISOString().substring(0, 10) + 'Z',
         stars,
         license,
         description,
@@ -160,9 +166,9 @@ export async function fetchGithubEntries({cache, preferCache}) {
         return cachedEntry;
       } else {
         addError('github');
-        setFatalError();
         reporter.write(fatal('F'));
         errors.push(fatal(`No cached entry, and ${repo.url} has issues with stats fetching: ${ex.message.substring(0, 100)}`));
+        setFatalError(`No cached entry, and ${repo.url} has issues with stats fetching: ${ex.message.substring(0, 100)}`);
         return null;
       }
     }

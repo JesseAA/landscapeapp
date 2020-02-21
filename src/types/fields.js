@@ -16,11 +16,27 @@ import settings from 'project/settings.yml';
 import isParent from '../utils/isParent';
 
 const relationField = (function() {
+  const additionalRelations = settings.relation.values.flatMap(({ children }) => children || [])
+    .reduce((obj, { id, additional_relation }) => {
+      obj[id] = additional_relation;
+      return obj;
+    }, {});
   const rootEntry = {
     id: 'relation',
     url: 'project',
     label: settings.relation.label,
-    isArray: true
+    isArray: true,
+    filterFn: (filter, value) => {
+      return filter.length === 0 || filter.includes(value) || filter.includes(additionalRelations[value]);
+    },
+    groupFn: ({ item, filters }) => {
+      const { relation } = item;
+      if ((filters.relation && filters.relation.includes(relation)) || !additionalRelations[relation]) {
+        return relation;
+      } else {
+        return additionalRelations[relation];
+      }
+    }
   }
   const firstEntry = settings.relation.values[0];
   if (!firstEntry.children) {
@@ -120,8 +136,7 @@ const fields = {
         return x.value;
       }
       return x;
-    },
-    hideInGrouping: true
+    }
   },
   latestCommitDate: {
     id: 'latestCommitDate',
@@ -132,8 +147,7 @@ const fields = {
         return x.value;
       }
       return x;
-    },
-    hideInGrouping: true
+    }
   },
   latestTweetDate: {
     id: 'latestTweetDate',
@@ -147,14 +161,17 @@ const fields = {
         return x.value;
       }
       return x;
-    },
-    hideInGrouping: true
+    }
   },
   contributorsCount: {
     id: 'contributorsCount',
     label: 'Contributors #',
-    url: 'contributors',
-    hideInGrouping: true
+    url: 'contributors'
+  },
+  commitsThisYear: {
+    id: 'commitsThisYear',
+    label: 'Commits this year',
+    url: 'commits'
   },
   bestPracticeBadgeId: {
     id: 'bestPracticeBadgeId',
@@ -177,16 +194,11 @@ const fields = {
     id: 'enduser',
     label: 'End User',
     url: 'enduser',
-    filterFn: function(filter, value, record) {
+    filterFn: function(filter, value) {
       if (filter === null) {
         return true;
       }
-      if (filter === true) {
-        return !!value || record.landscape === 'CNCF Members / End User Supporter' ;
-      }
-      if (filter === false) {
-        return !value && record.landscape !== 'CNCF Members / End User Supporter';
-      }
+      return filter === true ? value : !value;
     },
     values: [{id: true, label: 'Yes', url: 'yes'}, {id: false, label: 'No', url: 'no'}]
   },
@@ -195,13 +207,35 @@ const fields = {
     url: 'googlebot',
     values: [{ id: true, url: 'yes' }, { id: false, url: 'no' }]
   },
-  parent: {
+  parents: {
     id: 'parent',
     url: 'parent',
+    isArray: true,
     values: lookups.crunchbaseSlugs.map((id) => {
       return { id: id }
     }),
-    filterFn: (filter, _, record) => !filter || isParent(filter, record)
+    filterFn: (parents, _, record) => parents.length === 0 || parents.find(parent => isParent(parent, record))
+  },
+  language: {
+    id: 'language',
+    url: 'language',
+    values: lookups.languages.map( (id) => ({id: decodeURIComponent(id), url: id})).concat({
+      id: null,
+      url: 'no',
+      label: 'No information'
+    }),
+    filterFn:  function(filter, value, record) {
+      if (filter === null) {
+        return record.language === null;
+      }
+      if (!filter) {
+        return true;
+      }
+      if (!(record.github_data || {}).languages) {
+        return false;
+      }
+      return !! _.find(record.github_data.languages.slice(0, 7), { name: filter })
+    }
   }
 };
 _.each(fields, function(field, key) {
@@ -295,8 +329,7 @@ export function filterFn({field, filters}) {
     }
   };
 }
-export function getGroupingValue({item, grouping}) {
-  const fieldInfo = fields[grouping];
-  const value = item[fieldInfo.id];
-  return value;
+export function getGroupingValue({item, grouping, filters}) {
+  const { id, groupFn } = fields[grouping];
+  return groupFn ? groupFn({ item , filters }) : item[id];
 }

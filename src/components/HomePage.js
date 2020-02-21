@@ -10,10 +10,9 @@ import Sorting from './Sorting';
 import PresetsContainer from './PresetsContainer';
 import Ad from './Ad';
 import AutoSizer from './CustomAutoSizer';
+import OutboundLink from './OutboundLink';
 import {
-  MainLandscapeContentContainer,
-  ExtraLandscapeContentContainer,
-  ThirdLandscapeContentContainer,
+  LandscapeContentContainer,
   SwitchButtonContainer,
   ZoomButtonsContainer,
   FullscreenButtonContainer
@@ -24,7 +23,6 @@ import HomePageUrlContainer from './HomePageUrlContainer';
 import HomePageScrollerContainer from './HomePageScrollerContainer';
 import ResetFiltersContainer from './ResetFiltersContainer';
 import ItemDialogContainer from './ItemDialogContainer';
-import ItemDialogButtonsContainer from './ItemDialogButtonsContainer';
 import HeaderContainer from './HeaderContainer';
 import SummaryContainer from './SummaryContainer';
 import ExportCsvContainer from './ExportCsvContainer';
@@ -32,15 +30,9 @@ import Footer from './Footer';
 import EmbeddedFooter from './EmbeddedFooter';
 
 import isIphone from '../utils/isIphone';
-import isMobile from '../utils/isMobile';
-import isDesktop from '../utils/isDesktop';
 import isGoogle from '../utils/isGoogle';
 import bus from '../reducers/bus';
 import settings from 'project/settings.yml'
-
-const mainSettings = settings.big_picture.main;
-const extraSettings = settings.big_picture.extra || {};
-const thirdSettings = settings.big_picture.third || {};
 
 const state = {
   lastScrollPosition: 0
@@ -50,6 +42,28 @@ bus.on('scrollToTop', function() {
   (document.scrollingElement || document.body).scrollTop = 0;
 });
 
+function preventDefault(e){
+  const modal = e.srcElement.closest('.modal-body');
+  if (!modal) {
+    e.preventDefault();
+  }
+}
+
+function disableScroll(){
+  const shadow = document.querySelector('.MuiBackdrop-root');
+  if (shadow) {
+    shadow.addEventListener('touchmove', preventDefault, { passive: false });
+  }
+  document.body.addEventListener('touchmove', preventDefault, { passive: false });
+}
+
+function enableScroll(){
+  const shadow = document.querySelector('.MuiBackdrop-root');
+  if (shadow) {
+    shadow.removeEventListener('touchmove', preventDefault);
+  }
+  document.body.removeEventListener('touchmove', preventDefault);
+}
 
 const HomePage = ({isEmbed, mainContentMode, ready, hasSelectedItem, filtersVisible, hideFilters, showFilters, onClose, title, isFullscreen}) => {
   const isBigPicture = mainContentMode !== 'card';
@@ -84,13 +98,14 @@ const HomePage = ({isEmbed, mainContentMode, ready, hasSelectedItem, filtersVisi
       }
       document.querySelector('html').classList.add('has-selected-item');
       (document.scrollingElement || document.body).scrollTop = 0;
+      disableScroll();
     } else {
       document.querySelector('html').classList.remove('has-selected-item');
       if (document.querySelector('.iphone-scroller')) {
         (document.scrollingElement || document.body).scrollTop = state.lastScrollPosition;
       }
+      enableScroll();
     }
-    //try to get a current scroll if we are in a normal mode
   }
 
   if (isEmbed) {
@@ -134,47 +149,18 @@ const HomePage = ({isEmbed, mainContentMode, ready, hasSelectedItem, filtersVisi
     document.querySelector('body').classList.add('embed');
   }
 
-  function handleShadowClick(e) {
-    if (!(isIphone && hasSelectedItem)) {
-      return;
-    }
-    if (window.matchMedia("(orientation: portrait)").matches) {
-      const x = e.clientX / window.innerWidth;
-      const y = e.clientY / window.innerHeight;
-      const marginX = 0.125;
-      const marginY = 0.06;
-      if ( x > marginX && x < 1 - marginX && y > marginY && y < 1 - marginY ) {
-        console.info('a click inside the mask, ignoring');
-      } else {
-        onClose();
-      }
-    }
-    if (window.matchMedia("(orientation: landscape)").matches) {
-      const x = e.clientX / window.innerWidth;
-      const y = e.clientY / window.innerHeight;
-      const marginX = 0.07;
-      const marginY = 0.1;
-      if ( x > marginX && x < 1 - marginX && y > marginY) {
-        console.info('a click inside the mask, ignoring');
-      } else {
-        onClose();
-      }
-    }
-  }
-
   return (
-    <div onClick={handleShadowClick} >
+    <div>
     <HomePageScrollerContainer/>
     <ItemDialogContainer/>
-    { isIphone && <ItemDialogButtonsContainer/> }
-    <div className={classNames('app',{'filters-opened' : filtersVisible, 'background': isIphone && hasSelectedItem})}>
-      <div className={classNames({"shadow": isIphone && hasSelectedItem})} />
+    <div className={classNames('app',{'filters-opened' : filtersVisible})}>
+      <div />
       <div style={{marginTop: (isIphone && hasSelectedItem) ? -state.lastScrollPosition : 0}} className={classNames({"iphone-scroller": isIphone && hasSelectedItem}, 'main-parent')} >
         { !isEmbed && !isFullscreen && <HeaderContainer/> }
-        { !isEmbed && !isFullscreen && <IconButton className="sidebar-show" onClick={showFilters}><MenuIcon /></IconButton> }
+        { !isEmbed && !isFullscreen && <IconButton className="sidebar-show" title="Show sidebar" onClick={showFilters}><MenuIcon /></IconButton> }
         { !isEmbed && !isFullscreen && <div className="sidebar">
           <div className="sidebar-scroll">
-            <IconButton className="sidebar-collapse" onClick={hideFilters}><CloseIcon /></IconButton>
+            <IconButton className="sidebar-collapse" title="Hide sidebar" onClick={hideFilters}><CloseIcon /></IconButton>
             <ResetFiltersContainer />
             <Grouping/>
             <Sorting/>
@@ -193,7 +179,7 @@ const HomePage = ({isEmbed, mainContentMode, ready, hasSelectedItem, filtersVisi
         <div className={classNames('main', {'embed': isEmbed})}>
           { !isEmbed && <div className="disclaimer">
             <span  dangerouslySetInnerHTML={{__html: settings.home.header}} />
-            Please <a target="_blank" href={`https://github.com/${settings.global.repo}`}>open</a> a pull request to
+            Please <OutboundLink to={`https://github.com/${settings.global.repo}`}>open</OutboundLink> a pull request to
             correct any issues. Greyed logos are not open source. Last Updated: {window.lastUpdated}
           </div> }
           { !isEmbed && <SummaryContainer /> }
@@ -208,12 +194,8 @@ const HomePage = ({isEmbed, mainContentMode, ready, hasSelectedItem, filtersVisi
             { isBigPicture &&
             <AutoSizer>
               {({ height }) => (
-                <div className='landscape-wrapper' style={{height: height}}>
-                  <div style={{width: '100%', height: '100%', position: 'relative', overflow: 'scroll', padding: 10}}>
-                    { mainContentMode === mainSettings.url && <MainLandscapeContentContainer /> }
-                    { mainContentMode === extraSettings.url && <ExtraLandscapeContentContainer /> }
-                    { mainContentMode === thirdSettings.url && <ThirdLandscapeContentContainer /> }
-                  </div>
+                <div className="landscape-wrapper" style={{height: height}}>
+                  <LandscapeContentContainer />
                 </div>
               )}
             </AutoSizer>

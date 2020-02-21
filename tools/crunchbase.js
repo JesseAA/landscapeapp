@@ -1,6 +1,5 @@
 import { setFatalError } from './fatalErrors';
 import colors from 'colors';
-import process from 'process'
 import rp from './rpRetry'
 import Promise from 'bluebird'
 import _ from 'lodash';
@@ -13,10 +12,7 @@ const error = colors.red;
 const fatal = (x) => colors.red(colors.inverse(x));
 const cacheMiss = colors.green;
 const debug = require('debug')('cb');
-const key = process.env.CRUNCHBASE_KEY;
-if (!key) {
-  console.info('key not provided');
-}
+import { CrunchbaseClient } from './apiClients';
 
 export async function getCrunchbaseOrganizationsList() {
   const traverse = require('traverse');
@@ -66,7 +62,7 @@ export async function extractSavedCrunchbaseEntries() {
   return _.uniq(organizations);
 }
 
-async function getParentCompanies(companyInfo) {
+async function getParentCompanies(companyInfo, visited = []) {
   var parentInfo = companyInfo.relationships.owned_by.item;
   // console.info(`looking for parent for ${companyInfo.name}`);
   // console.info(`parentInfo is ${parentInfo}`);
@@ -75,20 +71,16 @@ async function getParentCompanies(companyInfo) {
     return [];
   } else {
     var parentId = parentInfo.uuid;
+    const { permalink } = parentInfo.properties;
     if (parentId === companyInfo.uuid) {
       return []; //we are the parent and this hangs up the algorythm
     }
-    var fullParentInfo =  await rp({
-      method: 'GET',
-      maxRedirects: 5,
-      followRedirect: true,
-      uri: `https://api.crunchbase.com/v3.1/organizations/${parentId}?user_key=${key}`,
-      timeout: 10 * 1000,
-      json: true
-    });
+    if (visited.includes(permalink)) {
+      throw new Error(`Cyclic dependency detected when fetching parents: ${visited.join(', ')}, ${permalink}`);
+    }
+    var fullParentInfo = await CrunchbaseClient.request({ path: `/organizations/${parentId}` });
     var cbInfo = fullParentInfo.data;
-    await Promise.delay(1 * 1000);
-    return [parentInfo].concat(await getParentCompanies(cbInfo));
+    return [parentInfo].concat(await getParentCompanies(cbInfo, [...visited, permalink]));
   }
 }
 const marketCapCache = {};
@@ -132,30 +124,11 @@ export async function fetchCrunchbaseEntries({cache, preferCache}) {
       cachedEntry.parents = cachedEntry.parents || [];
       return cachedEntry;
     }
-    await Promise.delay(1 * 1000);
-    if (c.crunchbase === 'https://www.cncf.io') {
-      const entry = {
-        url: c.crunchbase,
-        name: 'Non-Public Unnamed Organization',
-        description: '',
-        homepage: 'https://www.cncf.io',
-        city: 'Bouvet Island',
-        region: 'Antarctica',
-        country: 'Antarctica',
-        twitter: 'https://twitter.com/CloudNativeFdn',
-        linkedin: null
-      }
-      return entry;
+    if (c.unnamed_organization) {
+      return {};
     }
     try {
-      const result = await rp({
-        method: 'GET',
-        maxRedirects: 5,
-        followRedirect: true,
-        uri: `https://api.crunchbase.com/v3.1/organizations/${c.name}?user_key=${key}`,
-        timeout: 10 * 1000,
-        json: true
-      });
+      const result = await CrunchbaseClient.request({ path: `/organizations/${c.name}` });
       var cbInfo = result.data.properties;
       var twitterEntry = _.find(result.data.relationships.websites.items, (x) => x.properties.website_name === 'twitter');
       var linkedInEntry = _.find(result.data.relationships.websites.items, (x) => x.properties.website_name === 'linkedin');
@@ -176,7 +149,7 @@ export async function fetchCrunchbaseEntries({cache, preferCache}) {
       if (_.isEmpty(entry.city)) {
         addError('crunchbase');
         debug(`empty city on ${c.name}`);
-        setFatalError();
+        setFatalError(`No city for a crunchbase entry for ${c.name} at ${c.crunchbase} `);
         errors.push(fatal(`No city for a crunchbase entry for ${c.name} at ${c.crunchbase} `));
         reporter.write(fatal("F"));
         return null;
@@ -207,7 +180,7 @@ export async function fetchCrunchbaseEntries({cache, preferCache}) {
     } catch (ex) {
       if (cachedEntry) {
         addWarning('crunchbase');
-        debug(`normal request failed, so returning a cached entry for ${c.name}`);
+        debug(`normal request failed, so returning a cached entry for ${c.name} ${ex.message.substring(0, 200)}`);
         errors.push(error(`Using cached entry, because can not fetch: ${c.name} ` +  ex.message.substring(0, 200)));
         reporter.write(error("E"));
         return cachedEntry;
@@ -215,7 +188,7 @@ export async function fetchCrunchbaseEntries({cache, preferCache}) {
         // console.info(c.name);
         addError('crunchbase');
         debug(`normal request failed, and no cached entry for ${c.name}`);
-        setFatalError();
+        setFatalError(`No cached entry, and can not fetch: ${c.name} ` + ex.message.substring(0, 200));
         errors.push(fatal(`No cached entry, and can not fetch: ${c.name} ` +  ex.message.substring(0, 200)));
         reporter.write(fatal("F"));
         return null;

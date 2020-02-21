@@ -5,6 +5,7 @@ import InternalLink from '../InternalLink';
 import Fade from '@material-ui/core/Fade';
 import fields from '../../types/fields';
 import settings from 'project/settings.yml'
+import { getContrastRatio } from "@material-ui/core/styles";
 
 const itemWidth = 36;
 const itemHeight = 32;
@@ -24,27 +25,25 @@ const Item = (function({zoom, item, x, y, isLarge, onSelectItem}) {
   }
   const k = 1;
   const isMember = item.category === settings.global.membership;
-  return <div style={{
-    cursor: 'pointer',
-    position: 'absolute',
-    left: (itemWidth * x) * zoom,
-    top: (itemHeight * y) * zoom,
-    width: (itemWidth  * k) * zoom,
-    height: (itemHeight * k) * zoom }}
-    key={item.id}
-  >
-    <img src={item.href} style={{
-      width: (itemWidth * k - 2) * zoom,
+  return <img style={{
+      cursor: 'pointer',
+      position: 'absolute',
+      left: (itemWidth * x + 2) * zoom,
+      top: (itemHeight * y + 2) * zoom,
+      width: (itemWidth  * k - 2) * zoom,
       height: (itemHeight * k - 2) * zoom,
-      margin: 2 * zoom,
-      padding: 2 * zoom,
       border: isMember ? '' : `${1 * zoom}px solid grey`,
       borderRadius: 3 * zoom,
-      background: isMember ? '' : item.oss ? '' : '#eee'
+      padding: 1,
+      background: isMember ? '' : item.oss ? '' : '#eee',
     }}
+    data-href={item.id}
+    loading="lazy"
+    src={item.href}
+    key={item.id}
     onClick={ () => onSelectItem(item.id)}
+    alt={item.name}
   />
-  </div>;
 })
 
 const LargeItem = (function({zoom, item, x, y, onSelectItem}) {
@@ -55,9 +54,12 @@ const LargeItem = (function({zoom, item, x, y, onSelectItem}) {
   const relationInfo = _.find(fields.relation.values, {id: item.relation});
   const color = relationInfo.big_picture_color;
   const label = relationInfo.big_picture_label;
+  const isMember = item.category === settings.global.membership;
+
   return <div style={{
     cursor: 'pointer',
     position: 'absolute',
+    background: isMember ? '' : item.oss ? '' : '#eee',
     border: `${z(2)}px solid ${color}`,
     left: (itemWidth * x + 3) * zoom,
     top: (itemHeight * y + 3) * zoom,
@@ -66,12 +68,12 @@ const LargeItem = (function({zoom, item, x, y, onSelectItem}) {
     onClick={ () => onSelectItem(item.id)}
     key={item.id}
   >
-    <img src={item.href} style={{
+    <img loading="lazy" src={item.href} style={{
       width: (itemWidth * k - 2 - 5) * zoom,
       height: (itemHeight * k - 9 - 2 - 10) * zoom,
       margin: z(2),
       padding: z(2)
-    }} />
+    }} data-href={item.id} alt={item.name} />
   <div style={{position: 'absolute', left: 0, right: 0, bottom: 0, height: 10 * zoom, textAlign: 'center', background: color, color: 'white', fontSize: 6.7 * zoom, lineHeight: `${13 * zoom}px`}}>
     {label}
   </div>
@@ -176,66 +178,74 @@ const getSubcategoryWidth = function({subcategory, rows}) {
   });
   const cols = Math.max(Math.ceil(total / categoryHeight ), 2);
   const width = itemWidth * cols;
-  console.info(`Subcategory ${subcategory.name} has a width: ${width}`);
   return width;
 }
 
 const HorizontalCategory = (function({header, subcategories, rows, width, height, top, left, zoom, color, href, onSelectItem, fitWidth, offset = 50}) {
 
   let innerWidth = _.sumBy(subcategories, (subcategory) =>  getSubcategoryWidth({subcategory, rows}));
-  if (subcategories.length > 1) {
-    console.info(`${header} has a width of ${innerWidth}, but expected width is ${width}`);
-  }
   const xRatio = fitWidth ? (width - offset ) / innerWidth : 1.05;
 
   return (
     <div style={{
       position: 'absolute', height: height * zoom, margin: 5 * zoom, width: width * zoom, top: (top - 5) * zoom, left: left * zoom
     }} className="big-picture-section" >
-    <div style={{position: 'absolute', top: 20 * zoom, height: (height - 20) * zoom, width: 30 * zoom, opacity: 0.5, zIndex: 10}}>
-        <InternalLink to={href}>
-          <div style={{
-            width: '100%',
-            height: '100%'
-          }}></div>
-        </InternalLink>
-    </div>
-      <div style={{transform: 'rotate(-90deg)', width: (height - 20) * zoom, height: 30 * zoom, top: ((height + 20) / 2 - 30 / 2) * zoom, left: (-(height / 2 - 30/2) + 20/2) * zoom, textAlign: 'center', position: 'absolute', background:color, color: 'white', fontSize: 13 * zoom}}>
-        <div style={{
-          color: 'white',
-          fontSize: 12 * zoom,
+      <div
+        style={{
           position: 'absolute',
-          width: '100%',
-          transform: 'translate(-50%, -50%)',
-          left: '50%',
-          top:'50%'}}>{header}</div>
+          border: `${1 * zoom}px solid ${color}`,
+          borderLeft: 0,
+          background: 'white',
+          top: 20 * zoom,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          boxShadow: `0 ${4 * zoom}px ${8 * zoom}px 0 rgba(0, 0, 0, 0.2), 0 ${6 * zoom}px ${20 * zoom}px 0 rgba(0, 0, 0, 0.19)`
+        }}
+      >
+        <div style={{
+          top: '-1px',
+          bottom: '-1px',
+          left: '-1px',
+          width: 31 * zoom,
+          position: 'absolute',
+          writingMode: 'vertical-rl',
+          transform: 'rotate(180deg)',
+          background: color,
+          textAlign: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <InternalLink to={href} style={{
+            color: getContrastRatio('#ffffff', color) < 4.5 ? '#282828' : '#ffffff',
+            fontSize: 12 * zoom,
+            lineHeight: `${13 * zoom}px`
+          }}>
+            {header}
+          </InternalLink>
+        </div>
       </div>
-      <div style={{width: 40 * zoom, display: 'inline-block'}} />
-      <div style={{position: 'absolute', border: `${1 * zoom}px solid ${color}`, background: 'white', top: 20 * zoom, bottom: 0, left: 30 * zoom, right: 0}}></div>
-      <div style={{position: 'absolute', top: 20 * zoom, bottom: 0, left: 0, right: 0,
-        boxShadow: `0 ${4 * zoom}px ${8 * zoom}px 0 rgba(0, 0, 0, 0.2), 0 ${6 * zoom}px ${20 * zoom}px 0 rgba(0, 0, 0, 0.19)`
-      }}></div>
       <div style={{position: 'absolute', left: 35 * zoom, top: 0, right: 10 * zoom, bottom: 0, display: 'flex', justifyContent: 'space-between'}}>
         {subcategories.map(function(subcategory, index, all) {
           return [
             <div key={subcategory.name} style={{position: 'relative', fontSize: `${10 * zoom}px`}}>
               <div style={{position: 'relative', width: '100%', height: 40 * zoom, top: -14 * zoom}}>
-                <span style={{textAlign: 'center', position: 'absolute', width: '100%', minWidth: 80 * zoom, transform: 'translate(-50%, -50%)', left: '50%', top:'50%'}}>
-                  <InternalLink to={subcategory.href}>
-                    <span style={{
-                      color: 'white',
-                      fontSize: 10 * zoom
-                    }}>{subcategory.name}</span>
-                  </InternalLink>
-                </span>
+                  <span style={{textAlign: 'center', position: 'absolute', width: '100%', minWidth: 80 * zoom, transform: 'translate(-50%, -50%)', left: '50%', top:'50%'}}>
+                    <InternalLink to={subcategory.href}>
+                      <span style={{
+                        color: 'white',
+                        fontSize: 11 * zoom
+                      }}>{subcategory.name}</span>
+                    </InternalLink>
+                  </span>
               </div>
               <HorizontalSubcategory subcategory={subcategory} rows={rows} zoom={zoom} onSelectItem={onSelectItem} parentHeight={height} xRatio={xRatio} key={subcategory.name}/>
             </div>,
             index !== all.length - 1 && <div key={index} style={{ top: 40 * zoom, height: `calc(100% - ${50 * zoom}px)`, border: `${Math.max(Math.round(zoom) / 2, 0.5)}px solid #777`, position: 'relative' }}></div>
-            ]
+          ]
         })}
       </div>
-
   </div>);
 });
 
@@ -244,7 +254,7 @@ const VerticalCategory = (function({header, subcategories, cols = 6, top, left, 
   const xRatio = 1.07;
   return (<div style={{}}>
     <div style={{
-      position: 'absolute', top: top -5 * zoom, left: left * zoom, height: height * zoom, margin: 5 * zoom, width: (width + 2) * zoom, background: 'white', border: `${1 * zoom}px solid ${color}`,
+      position: 'absolute', top: (top - 5) * zoom, left: left * zoom, height: height * zoom, margin: 5 * zoom, width: (width + 2) * zoom, background: 'white', border: `${1 * zoom}px solid ${color}`,
       boxShadow: `0 ${4 * zoom}px ${8 * zoom}px 0 rgba(0, 0, 0, 0.2), 0 ${6 * zoom}px ${20 * zoom}px 0 rgba(0, 0, 0, 0.19)`
     }} className="big-picture-section">
     <div style={{ width: width * zoom, height: 20 * zoom, lineHeight: `${20 * zoom}px`, textAlign: 'center', color: 'white', background: color, fontSize: 12 * zoom}}>
@@ -261,8 +271,8 @@ const VerticalCategory = (function({header, subcategories, cols = 6, top, left, 
           <div style={{ fontSize: 10 * zoom, lineHeight: `${15 * zoom}px`, textAlign: 'center', color: color}}>
             <InternalLink to={subcategory.href}>
               <span style={{
-                color: color,
-                fontSize: 10 * zoom
+                color: '#282828',
+                fontSize: 11 * zoom
               }}>{subcategory.name}</span>
             </InternalLink>
           </div>

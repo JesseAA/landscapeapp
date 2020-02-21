@@ -11,13 +11,17 @@ console.info(require('child_process').execSync(`cd '${projectPath}'; git fetch g
 
 function getFileFromHistory(days) {
   const commit = getCommitFromHistory(days);
-  const content = require('child_process').execSync(`cd '${projectPath}'; git show ${commit}:processed_landscape.yml`).toString('utf-8');
+  const content = require('child_process').execSync(`cd '${projectPath}'; git show ${commit}:processed_landscape.yml`, {
+    maxBuffer: 100 * 1024 * 1024
+  }).toString('utf-8');
   const source = require('js-yaml').safeLoad(content);
   return source;
 }
 
 function getCommitFromHistory(days) {
-  const commit = require('child_process').execSync(`cd '${projectPath}'; git log --format='%H' -n 1 --before='{${days} days ago}' --author='CNCF-bot' github/master`).toString('utf-8').trim();
+  const commit = require('child_process').execSync(`cd '${projectPath}'; git log --format='%H' -n 1 --before='{${days} days ago}' --author='CNCF-bot' github/master`, {
+    maxBuffer: 100 * 1024 * 1024
+  }).toString('utf-8').trim();
   return commit;
 }
 
@@ -48,7 +52,7 @@ function buildDiff({currentItems, prevItems, date, result}) {
       return;
     }
     const previousEntry = _.find(prevItems, (prevItem) => prevItem.crunchbase_data && prevItem.crunchbase_data.name === item.crunchbase_data.name);
-    if (previousEntry && item.crunchbase_data.funding !== previousEntry.crunchbase_data.funding) {
+    if (previousEntry && Math.abs(item.crunchbase_data.funding - previousEntry.crunchbase_data.funding) > 100) {
       const membership = _.find(dataJson, {crunchbase: item.crunchbase}).member;
       result.push({
         name: item.crunchbase_data.name,

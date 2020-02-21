@@ -5,7 +5,7 @@ import webpack from 'webpack';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import path from 'path';
-import WebappWebpackPlugin from 'webapp-webpack-plugin';
+import FaviconsWebpackPlugin from 'favicons-webpack-plugin';
 // const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 import {projectPath, settings} from './tools/settings';
@@ -47,6 +47,9 @@ export default {
       'favicon.png': path.resolve(projectPath, 'images/favicon.png'),
     }
   },
+  externals: {
+    moment: 'moment'
+  },
   devtool: 'source-map', // more info:https://webpack.js.org/guides/production/#source-mapping and https://webpack.js.org/configuration/devtool/
   entry: path.resolve(__dirname, 'src/index.js'),
   target: 'web',
@@ -81,11 +84,18 @@ export default {
       lastUpdated: new Date().toISOString().substring(0, 19).replace('T', ' ') + 'Z',
       settings: settings
     }),
-    new WebappWebpackPlugin({
+    // Generate manifest and logos
+    new FaviconsWebpackPlugin({
         logo: path.resolve(projectPath, 'images/favicon.png'),
+        prefix: '',
         favicons: {
           appName: settings.global.name,
           icons: {
+            appleIcon: false,
+            appleStartup: false,
+            firefox: false,
+            coast: false,
+            windows: false,
             yandex: false
           }
         }
@@ -211,7 +221,9 @@ export default {
           }, {
             loader: 'sass-loader',
             options: {
-              includePaths: [path.resolve(__dirname, 'src', 'scss')],
+              sassOptions: {
+                includePaths: [path.resolve(__dirname, 'src', 'scss')]
+              },
               sourceMap: true
             }
           }

@@ -1,10 +1,13 @@
+import './suppressAnnoyingWarnings';
 import _ from 'lodash';
 import Promise from 'bluebird';
 import { settings } from './settings';
+import { hasFatalErrors, setFatalError, reportFatalErrors } from './fatalErrors';
 const urls = _.map(settings.big_picture, (section) => section.url);
 const port = process.env.PORT || '4000';
 async function main() {
   const puppeteer = require('puppeteer');
+  console.info('go!');
   const browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox']});
   const page = await browser.newPage();
   var hasErrors = false;
@@ -32,6 +35,9 @@ async function main() {
       return result;
     });
     if (errors.length > 0) {
+      for (var error of errors) {
+        setFatalError(`Page: ${format}, section ${error} is out of bound`);
+      }
       console.info(`FATAL ERROR: layout issues. On a ${format} page, following section(s) has their items out of bounds:`);
       console.info(errors);
       hasErrors = true;
@@ -39,6 +45,7 @@ async function main() {
   }
   await browser.close();
   if (hasErrors) {
+    await reportFatalErrors();
     process.exit(1);
   }
 }

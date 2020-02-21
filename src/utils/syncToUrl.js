@@ -12,57 +12,7 @@ const sortOptions = options.map(function(x) {
 });
 
 import settings from 'project/settings.yml';
-const mainSettings = settings.big_picture.main;
-const extraSettings = settings.big_picture.extra || {};
-const thirdSettings = settings.big_picture.third || {};
-
-export function addNoIndexIfRequired() {
-  const url = window.location.pathname;
-  const isSelectedOnMainLandscape = url.indexOf('/' + window.prefix + 'selected=') === 0 && url.indexOf('&') === -1;
-  const isSelectedOnSecondLandscape = url.indexOf(`/${window.prefix}format=${extraSettings.url}&selected=`) === 0 && url.split('&').length === 2;
-  const isSelectedOnThirdLandscape = url.indexOf(`/${window.prefix}format=${thirdSettings.url}&selected=`) === 0 && url.split('&').length === 2;
-  const isMainLandscape = url === '/' + window.prefix;
-  const isSecondLandscape = url === `/${window.prefix}format=${extraSettings.url}`;
-  const isThirdLandscape = url === `/${window.prefix}format=${thirdSettings.url}`;
-  const isCardMode = url === `/${window.prefix}format=card-mode`;
-  if (url === '/' + window.prefix || isSelectedOnMainLandscape || isSelectedOnSecondLandscape || isSelectedOnThirdLandscape
-    || isMainLandscape || isSecondLandscape || isThirdLandscape || isCardMode
-  ) {
-    console.info('this can be indexed');
-    const existingMeta = document.querySelector('meta[name="robots"]');
-    if (existingMeta) {
-      const head = document.getElementsByTagName('head')[0];
-      head.removeChild(existingMeta);
-    }
-
-    const existingCanonical = document.getElementById('canonicalLink');
-    if (existingCanonical) {
-      const head = document.getElementsByTagName('head')[0];
-      head.removeChild(existingCanonical);
-    }
-    var canonicalLink=document.createElement('link');
-    canonicalLink.id = 'canonicalLink';
-    canonicalLink.rel='canonical';
-    canonicalLink.href = window.location.href;
-    const head = document.getElementsByTagName('head')[0];
-    head.insertBefore(canonicalLink, head.firstChild);
-  } else {
-    console.info('adding a no index meta tag for ', url);
-    const existingMeta = document.querySelector('meta[name="robots"]');
-    if (!existingMeta) {
-      var link=document.createElement('meta');
-      link.name='robots';
-      link.content = 'noindex';
-      const head = document.getElementsByTagName('head')[0];
-      head.insertBefore(link, head.firstChild);
-    }
-    const existingCanonical = document.getElementById('canonicalLink');
-    if (existingCanonical) {
-      const head = document.getElementsByTagName('head')[0];
-      head.removeChild(existingCanonical);
-    }
-  }
-}
+import { findLandscapeSettings } from './landscapeSettings';
 
 export function filtersToUrl({filters, grouping, sortField, selectedItemId, zoom, mainContentMode = 'card', isLogoMode = false, isFullscreen}) {
   const prefix = window.prefix;
@@ -167,14 +117,8 @@ function addMainContentModeToParams({mainContentMode, isLogoMode, params}) {
   }
 
   if (mainContentMode !== initialMainContentMode) {
-    if (mainContentMode === mainSettings.url) {
-      params['format'] = mainSettings.url;
-    }
-    if (mainContentMode === extraSettings.url && extraSettings.url) {
-      params['format'] = extraSettings.url;
-    }
-    if (mainContentMode === thirdSettings.url && thirdSettings.url) {
-      params['format'] = thirdSettings.url;
+    if (findLandscapeSettings(mainContentMode)) {
+      params['format'] = mainContentMode
     }
     if (mainContentMode === 'card') {
       params['format'] = 'card-mode';
@@ -222,7 +166,9 @@ function setFieldFromParams({field, filters, params}) {
   const parts = urlValue.split(',');
   const values = parts.map(function(part) {
     return _.find(fieldInfo.values, function(x) {
-      return x.url.toLowerCase() === part.toLowerCase();
+      const v = x.url.toLowerCase();
+      const p = part.toLowerCase();
+      return v === p || decodeURIComponent(v) === p || qs.parse(decodeURIComponent(v)) === p;
     });
   }).filter(function(x) { return !!x}).map(function(x) {
     return x.id;
@@ -264,11 +210,9 @@ function setSortFieldFromParams({ newParameters, params}) {
 function setMainContentModeFromParams({ newParameters, params}) {
   const format = params.format;
   if (!format) {
-    newParameters.mainContentMode = mainSettings.url;
-  } else if (format === extraSettings.url && extraSettings.url) {
-    newParameters.mainContentMode = extraSettings.url;
-  } else if (format === thirdSettings.url && thirdSettings.url) {
-    newParameters.mainContentMode = thirdSettings.url;
+    newParameters.mainContentMode = settings.big_picture.main.url;
+  } else if (findLandscapeSettings(format)) {
+    newParameters.mainContentMode = format;
   } else if (format === 'card-mode') {
     newParameters.mainContentMode = 'card';
     newParameters.isLogoMode = false;

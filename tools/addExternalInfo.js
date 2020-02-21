@@ -1,4 +1,4 @@
-import { hasFatalErrors } from './fatalErrors';
+import { hasFatalErrors, reportFatalErrors } from './fatalErrors';
 import process from 'process';
 import path from 'path';
 import { projectPath, settings } from './settings';
@@ -68,7 +68,6 @@ else if (key.toLowerCase() === 'complete') {
   console.info('Unknown level. Should be one of easy, medium, hard or complete');
 }
 
-
 async function main() {
 
   var crunchbaseEntries;
@@ -124,6 +123,8 @@ async function main() {
   });
 
   if (hasFatalErrors()) {
+    console.info('Reporting fatal errors');
+    await reportFatalErrors();
     process.exit(1);
   }
 
@@ -141,11 +142,16 @@ async function main() {
   const newSource = tree.map(function(node) {
     if (node && node.item === null) {
       //crunchbase
-      var crunchbaseInfo = _.clone(_.find(crunchbaseEntries, {url: node.crunchbase}));
-      if (crunchbaseInfo) {
-        delete crunchbaseInfo.url;
+      if (node.unnamed_organization) {
+        node.crunchbase = settings.global.self;
+        node.crunchbase_data = _.clone({ ...settings.anonymous_organization, parents: [] });
+      } else {
+        var crunchbaseInfo = _.clone(_.find(crunchbaseEntries, {url: node.crunchbase}));
+        if (crunchbaseInfo) {
+          delete crunchbaseInfo.url;
+        }
+        node.crunchbase_data = crunchbaseInfo;
       }
-      node.crunchbase_data = crunchbaseInfo;
       //github
       var githubEntry = _.clone(_.find(githubEntries, {url: node.repo_url}));
       if (githubEntry) {
@@ -223,6 +229,7 @@ async function main() {
   require('fs').writeFileSync(path.resolve(projectPath, 'processed_landscape.yml'), newContent);
 }
 main().catch(function(x) {
+  console.info('Reporting exception');
   console.info(x);
   process.exit(1);
 });

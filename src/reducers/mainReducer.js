@@ -4,15 +4,16 @@
 // data: null | { .. Data ... }
 import settings from 'project/settings.yml';
 import { loadData} from './api';
-import { addNoIndexIfRequired, filtersToUrl } from '../utils/syncToUrl';
+import { filtersToUrl } from '../utils/syncToUrl';
 import _ from 'lodash';
 import { push, replace } from 'connected-react-router';
 import { zoomLevels } from '../utils/zoom';
 import bus from './bus';
 import { getItemsForExport } from '../utils/itemsCalculator';
-import { bigPictureMethods } from '../utils/sharedItemsCalculator';
+import { getLandscapeCategories } from '../utils/sharedItemsCalculator';
 import exportItems from '../utils/csvExporter';
 import fields from '../types/fields';
+import { findLandscapeSettings } from "../utils/landscapeSettings";
 
 
 export const initialState = {
@@ -30,7 +31,8 @@ export const initialState = {
     bestPracticeBadgeId: null,
     enduser: null,
     googlebot: null,
-    parent: null,
+    language: undefined, // null means no language
+    parents: [],
   },
   grouping: 'relation',
   sortField: 'name',
@@ -164,11 +166,9 @@ export function changeParameters(value) {
         const mainContentMode = value.mainContentMode || state.mainContentMode;
         const item = _.find(state.data, {id: value.selectedItemId});
         if (mainContentMode !== 'card') {
-          const bigPictureSettings = _.find(_.values(settings.big_picture), function(bigPicture) {
-            return bigPicture.url === mainContentMode
-          });
+          const landscapeSettings = findLandscapeSettings(mainContentMode);
           const landscape = fields.landscape.values;
-          const categories = bigPictureMethods[bigPictureSettings.method]({bigPictureSettings: settings.big_picture, format: mainContentMode, landscape: landscape });
+          const categories = getLandscapeCategories({ landscapeSettings, landscape });
           const itemInCategories = _.find(categories, function(category) {
             return item && item.category === category.label;
           });
@@ -187,11 +187,9 @@ export function changeParameters(value) {
       dispatch(replace(url));
       if (state.ready === true) {
         dispatch(markInitialUrlAsHandled());
-        addNoIndexIfRequired();
       }
     } else {
       dispatch(setParameters({...value}));
-      addNoIndexIfRequired();
     }
   }
 }

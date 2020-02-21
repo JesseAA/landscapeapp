@@ -29,39 +29,39 @@
   <meta name="msvalidate.01" content="<%= htmlWebpackPlugin.options.settings.global.meta.ms_validate %>" />
   <title><%= htmlWebpackPlugin.options.settings.global.meta.title %></title>
   <script>
-    const parts = window.location.pathname.split('/'); // for example: /cncf/members or  /lfdl/landscape or /a/s/d/f
-    console.info({parts});
-    if (parts[1] === 'cncf') {
-      if (parts[3]) {
-        console.info(parts, 'cncf redirect!');
-        window.location = '/cncf'
+    if (navigator.userAgent !== "ReactSnap") {
+      const parts = window.location.pathname.split('/'); // for example: /cncf/members or  /lfai/landscape or /a/s/d/f
+      if (parts[1] === 'cncf') {
+        if (parts[3]) {
+          window.location = '/cncf'
+        }
       }
-    }
-    else if (parts[1] === 'lfdl') {
-      if (parts[3]) {
-        console.info(parts, 'lfdl redirect!');
-        window.location = '/lfdl'
+      else if (parts[1] === 'lfai') {
+        if (parts[3]) {
+          window.location = '/lfai'
+        }
       }
-    }
-    else if (parts[2]) {
-      console.info(parts, 'basic redirect!');
-      window.location = '/'
+      else if (parts[2]) {
+        window.location = '/'
+      }
     }
   </script>
   <script>
     window.prefix = ''; // this line will be replaced for a landscapeapp build
+    // adjust size
+    document.addEventListener("DOMContentLoaded", function() {
+      const el = document.querySelector('.landscape-wrapper');
+      if (el) {
+        var height = el.parentElement.clientHeight + window.innerHeight -
+        document.body.offsetHeight;
+        el.style.height = height + "px";
+      } else {
+        console.info('No el to adjust');
+      }
+    });
   </script>
 </head>
 <body>
-  <script>
-      var isGoogle = navigator.userAgent.indexOf('bot.html') !== -1;
-      if (isGoogle) {
-        var s = document.createElement("script");
-        s.type = "text/javascript";
-        s.src = "main.googlebot.js?" + Math.random();
-        document.body.appendChild(s);
-      }
-  </script>
   <div id="app"></div>
   </body>
 </html>

@@ -4,6 +4,7 @@ import devices from 'puppeteer/DeviceDescriptors';
 import { paramCase } from 'change-case';
 import { settings } from '../tools/settings';
 import { projects } from '../tools/loadData';
+import { landscapeSettingsList } from "../src/utils/landscapeSettings";
 const port = process.env.PORT || '4000';
 const appUrl = `http://localhost:${port}`;
 const width = 1920;
@@ -11,11 +12,19 @@ const height = 1080;
 let browser;
 let setup;
 
-if (process.env.SHOW_BROWSER) {
-  jest.setTimeout(30000);
-} else {
-  jest.setTimeout(20000);
-}
+expect.extend({
+  async toHaveElement(page, selectorOrXpath) {
+    const method = selectorOrXpath.slice(0, 2) === '//' ? '$x' : '$$';
+    const elements = await page[method](selectorOrXpath);
+    const pass = elements.length > 0;
+    const message = () => {
+      return `Element "${selectorOrXpath}" ${this.isNot ? "was not supposed to" : "could not"} be found.`
+    };
+    return { pass, message };
+  },
+})
+
+jest.setTimeout(process.env.SHOW_BROWSER ? 30000 : 20000);
 
 async function makePage(initialUrl) {
   try {
@@ -46,22 +55,15 @@ function embedTest() {
       // should be a clickable frame
       await frame.waitForXPath(`//h1[contains(text(), 'full interactive landscape')]`);
       // we should not see the content from a main mode
-      const wrongElement = await frame.$x(`//h1[text() = '${settings.test.header}']`);
-      if (wrongElement.length !== 0) {
-        throw 'A text from a normal mode is visible!';
-      }
+      await expect(frame).not.toHaveElement(`//h1[text() = '${settings.test.header}']`);
 
       // ensure that it is clickable
-      await frame.waitForSelector(`.mosaic img`);
+      await expect(frame).toHaveElement(`.mosaic img`);
       await frame.click(`.mosaic img`);
       await frame.waitForSelector(".modal-content");
     }, 6 * 60 * 1000); //give it up to 1 min to execute
   });
-
-
-
 }
-
 
 function mainTest() {
   describe("Main test", () => {
@@ -69,17 +71,19 @@ function mainTest() {
       console.info('about to open a page', appUrl + '/format=card-mode');
       const page = await makePage(appUrl + '/format=card-mode');
       console.info('page is open');
+      await page.waitFor('.cards-section');
+
       //header
-      await page.waitForXPath(`//h1[text() = '${settings.test.header}']`);
+      await expect(page).toHaveElement(`//h1[text() = '${settings.test.header}']`);
       console.info('header is present');
       //group headers
-      await page.waitForXPath(`//a[contains(text(), '${settings.test.section}')]`);
+      await expect(page).toHaveElement(`//a[contains(text(), '${settings.test.section}')]`);
       console.info('group headers are ok');
       // ensure that everything was loaded
-      await page.waitForXPath(`//*[contains(text(), 'You are viewing ')]`);
+      await expect(page).toHaveElement(`//*[contains(text(), 'You are viewing ')]`);
       console.info('group headers are ok');
       //card
-      await page.waitForSelector(`.mosaic img[src='logos/${settings.test.logo}']`);
+      await expect(page).toHaveElement(`.mosaic img[src='logos/${settings.test.logo}']`);
       console.info('there is a kubernetes card');
       //click on a card
       await page.click(`.mosaic img[src='logos/${settings.test.logo}']`);
@@ -95,7 +99,7 @@ function landscapeTest() {
   describe("Big Picture Test", () => {
     test("I visit a main landscape page and have all required elements", async () => {
       console.info('about to open a main landscape page');
-      const page = await makePage(appUrl + '/format=' + settings.big_picture.main.url);
+      const page = await makePage(appUrl);
       await page.waitForSelector('.big-picture-section');
       await page.click('.big-picture-section img[src]');
       await page.waitForSelector(".modal-content");
@@ -107,15 +111,15 @@ function landscapeTest() {
       await page.waitForSelector(".modal-content");
     }, 6 * 60 * 1000); //give it up to 1 min to execute
   });
-  if (settings.big_picture.extra) {
-    test("I visit an extra landscape page and have all required elements", async () => {
-      console.info('about to open an extra landscape page');
-      const page = await makePage(appUrl + '/format=' + settings.big_picture.extra.url);
+  landscapeSettingsList.slice(1).forEach(({ name, url }) => {
+    test(`I visit ${name} landscape page and have all required elements`, async () => {
+      console.info(`about to open ${name} landscape page`);
+      const page = await makePage(`${appUrl}/format=${url}`);
       await page.waitForSelector('.big-picture-section');
       await page.click('.big-picture-section img[src]');
       await page.waitForSelector(".modal-content");
     }, 6 * 60 * 1000); //give it up to 1 min to execute
-  }
+  })
 }
 
 describe("Normal browser", function() {

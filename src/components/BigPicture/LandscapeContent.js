@@ -6,7 +6,7 @@ import {HorizontalCategory, VerticalCategory } from './Elements';
 import LandscapeInfo from './LandscapeInfo';
 import OtherLandscapeLink from './OtherLandscapeLink';
 
-const LandscapeContent = ({groupedItems, onSelectItem, style, showPreview, switchToOther, switchToThird, zoom, landscapeSettings }) => {
+const LandscapeContent = ({groupedItems, onSelectItem, style, switchToLandscape, zoom, landscapeSettings }) => {
   const elements = landscapeSettings.elements.map(function(element) {
     if (element.type === 'HorizontalCategory') {
       const cat = _.find(groupedItems, {key: element.category});
@@ -23,23 +23,17 @@ const LandscapeContent = ({groupedItems, onSelectItem, style, showPreview, switc
         onSelectItem={onSelectItem}
       />
     }
-    if (element.type === 'OtherLandscapeLink') {
+    if (element.type === 'LandscapeLink') {
       return <OtherLandscapeLink {..._.pick(element, ['width','height','top','left','color', 'layout', 'title', 'url']) }
         zoom={zoom}
-        showPreview={showPreview}
-        onClick={switchToOther}
-      />
-    }
-    if (element.type === 'ThirdLandscapeLink') {
-      return <OtherLandscapeLink {..._.pick(element, ['width','height','top','left','color', 'layout', 'title', 'url']) }
-        zoom={zoom}
-        showPreview={showPreview}
-        onClick={switchToThird}
+        onClick={() => switchToLandscape(element.url)}
+        key={element.url}
       />
     }
     if (element.type === 'LandscapeInfo') {
       return <LandscapeInfo {..._.pick(element, ['width', 'height', 'top', 'left']) } childrenInfo={element.children}
         zoom={zoom}
+        key='landscape-info'
       />
     }
     return null;

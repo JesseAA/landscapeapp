@@ -21,12 +21,24 @@ const result = browserSync({
   server: {
     baseDir: path.resolve(projectPath, 'dist')
   },
-
   files: [
     'src/*.html'
   ],
+  ghostMode: false,
+  middleware: [
+    function (req, res, next) {
 
-  middleware: [historyApiFallback()]
+      const contentPath = path.resolve(projectPath, 'dist', 'prerender.html');
+      if (req.url === '/' && require('fs').existsSync(contentPath)) {
+          console.info('Serving prerendered content for /');
+          const content = require('fs').readFileSync(contentPath, 'utf-8');
+          res.end(content);
+      } else {
+        next();
+      }
+    },
+    historyApiFallback()
+  ]
 });
 require('fs').writeFileSync('/tmp/ci.pid', process.pid);
 export default result;
